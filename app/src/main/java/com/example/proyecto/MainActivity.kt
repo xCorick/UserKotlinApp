@@ -114,7 +114,7 @@ class MainActivity : AppCompatActivity() {
                     // Login fallido: mostrar el error
                     Toast.makeText(
                         this@MainActivity,
-                        "Error: ${result.exceptionOrNull()?.message}",
+                        "${result.exceptionOrNull()?.message}",
                         Toast.LENGTH_LONG
                     ).show()
                 }

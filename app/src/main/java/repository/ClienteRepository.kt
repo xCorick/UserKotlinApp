@@ -4,6 +4,7 @@ import com.example.proyecto.models.Cliente
 import com.example.proyecto.models.LoginResponse
 import com.example.proyecto.models.LoginRequest
 import com.example.proyecto.network.RetrofitClient
+import org.json.JSONObject
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -44,8 +45,11 @@ class ClienteRepository {
                 // Éxito: devolver el token
                 Result.success(respuesta.body()!!)
             } else {
-                // Error: la API devolvió un código de error (400, 401, 500, etc.)
-                Result.failure(Exception("Error ${respuesta.code()}: ${respuesta.message()}"))
+                // Extraer el mensaje del body de error
+                val errorBody = respuesta.errorBody()?.string()
+                val mensajeError = extraerMensajeError(errorBody)
+
+                Result.failure(Exception("Error ${respuesta.code()}: $mensajeError"))
             }
         } catch (e: IOException) {
             // Error de red: sin conexión a Internet o timeout
@@ -73,7 +77,11 @@ class ClienteRepository {
                 // Éxito: devolver la lista (vacía si es null)
                 Result.success(respuesta.body() ?: emptyList())
             } else {
-                Result.failure(Exception("Error ${respuesta.code()}: ${respuesta.message()}"))
+                // Extraer el mensaje del body de error
+                val errorBody = respuesta.errorBody()?.string()
+                val mensajeError = extraerMensajeError(errorBody)
+
+                Result.failure(Exception("Error ${respuesta.code()}: $mensajeError"))
             }
         } catch (e: IOException) {
             Result.failure(Exception("Error de red: ${e.message}"))
@@ -97,7 +105,11 @@ class ClienteRepository {
             if (respuesta.isSuccessful) {
                 Result.success(respuesta.body()!!)
             } else {
-                Result.failure(Exception("Error ${respuesta.code()}: ${respuesta.message()}"))
+                // Extraer el mensaje del body de error
+                val errorBody = respuesta.errorBody()?.string()
+                val mensajeError = extraerMensajeError(errorBody)
+
+                Result.failure(Exception("Error ${respuesta.code()}: $mensajeError"))
             }
         } catch (e: IOException) {
             Result.failure(Exception("Error de red: ${e.message}"))
@@ -122,7 +134,11 @@ class ClienteRepository {
             if (respuesta.isSuccessful) {
                 Result.success(respuesta.body()!!)
             } else {
-                Result.failure(Exception("Error ${respuesta.code()}: ${respuesta.message()}"))
+                // Extraer el mensaje del body de error
+                val errorBody = respuesta.errorBody()?.string()
+                val mensajeError = extraerMensajeError(errorBody)
+
+                Result.failure(Exception("Error ${respuesta.code()}: $mensajeError"))
             }
         } catch (e: IOException) {
             Result.failure(Exception("Error de red: ${e.message}"))
@@ -146,7 +162,11 @@ class ClienteRepository {
             if (respuesta.isSuccessful) {
                 Result.success(respuesta.body()!!)
             } else {
-                Result.failure(Exception("Error ${respuesta.code()}: ${respuesta.message()}"))
+                // Extraer el mensaje del body de error
+                val errorBody = respuesta.errorBody()?.string()
+                val mensajeError = extraerMensajeError(errorBody)
+
+                Result.failure(Exception("Error ${respuesta.code()}: $mensajeError"))
             }
         } catch (e: IOException) {
             Result.failure(Exception("Error de red: ${e.message}"))
@@ -154,6 +174,52 @@ class ClienteRepository {
             Result.failure(Exception("Error HTTP: ${e.message}"))
         } catch (e: Exception) {
             Result.failure(Exception("Error: ${e.message}"))
+        }
+    }
+
+    // FUNCIÓN PARA EXTRAER EL MENSAJE DEL JSON DE ERROR
+    private fun extraerMensajeError(errorBody: String?): String {
+        if (errorBody.isNullOrBlank()) return "Error desconocido"
+
+        return try {
+            val json = JSONObject(errorBody)
+
+            // Array de posibles campos de error en orden de prioridad
+            val camposError = listOf(
+                "message",      // Mensaje simple
+                "detail",       // RFC 9110
+                "errors",        // Error genérico
+                "title"         // Título del error
+            )
+
+            // Buscar el primer campo que exista
+            for (campo in camposError) {
+                if (json.has(campo)) {
+                    val valor = json.getString(campo)
+                    if (valor.isNotBlank()) {
+                        // Si tiene "errors" (validaciones), agregarlos
+                        if (json.has("errors")) {
+                            val errores = json.getJSONObject("errors")
+
+                            val keys = errores.keys()
+                            if (keys.hasNext()) {
+                                val key = keys.next()
+                                val listaErrores = errores.getJSONArray(key)
+                                val mensaje = listaErrores.getString(0)
+                                return mensaje.toString()
+                            }
+                        }
+                        return valor
+                    }
+                }
+            }
+
+            // Si no encuentra nada, devolver el JSON formateado
+            "Error del servidor:\n${json.toString(2)}"
+
+        } catch (e: Exception) {
+            // Si no es JSON válido, devolver el texto original
+            errorBody
         }
     }
 }

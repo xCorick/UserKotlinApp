@@ -441,7 +441,7 @@ class ClientesFragment : Fragment() {
                     } else {
                         Toast.makeText(
                             requireContext(),
-                            "Error: ${result.exceptionOrNull()?.message}",
+                            "${result.exceptionOrNull()?.message}",
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -452,7 +452,7 @@ class ClientesFragment : Fragment() {
                 }
             }
         } catch (e: Exception) {
-            Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

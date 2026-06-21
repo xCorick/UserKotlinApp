@@ -44,6 +44,10 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    // Material Design (para TextInputLayout, CardView)
+    implementation("com.google.android.material:material:1.12.0")
+    // CardView (si no viene incluido)
+    implementation("androidx.cardview:cardview:1.0.0")
 
 // Retrofit - Para consumir la API REST
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
