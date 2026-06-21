@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="12dp"
+    android:background="?android:attr/selectableItemBackground"
+    android:weightSum="2"
+    android:minHeight="44dp">
+
+    <!-- Muestra la clave del cliente -->
+    <TextView
+        android:id="@+id/tvClave"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="CLI001"
+        android:textSize="14sp"
+        android:textColor="#333333"
+        android:gravity="center"
+        android:padding="4dp" />
+
+    <!-- Línea divisoria entre columna Clave y Nombre -->
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="#BDBDBD" />
+
+    <!-- Muestra el nombre del cliente -->
+    <TextView
+        android:id="@+id/tvNombre"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:text="Herculano Pérez"
+        android:textSize="14sp"
+        android:textColor="#333333"
+        android:padding="4dp" />
+
+</LinearLayout>
