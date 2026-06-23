@@ -1,8 +1,7 @@
 package com.example.proyecto
 
+import android.app.DatePickerDialog
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -19,11 +18,14 @@ import com.example.proyecto.models.Cliente
 import com.example.proyecto.repository.ClienteRepository
 import com.example.proyecto.utils.SessionManager
 import kotlinx.coroutines.launch
-import org.w3c.dom.Text
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * Fragmento para el CRUD de Clientes.
- *
  *
  * Funcionalidades:
  * 1. Buscar cliente automáticamente al escribir una clave
@@ -32,7 +34,9 @@ import org.w3c.dom.Text
  * 4. Actualizar un cliente existente
  * 5. Eliminar un cliente con confirmación
  * 6. Grid de clientes que al hacer click carga los datos
- * 7. Formato automático de fecha: DD-MM-YYYY
+ * 7. Selector de fecha con DatePicker
+ * 8. Cálculo automático de la edad basado en la fecha de nacimiento
+ * 9. Restricción de fechas posteriores a hoy
  */
 class ClientesFragment : Fragment() {
 
@@ -54,15 +58,18 @@ class ClientesFragment : Fragment() {
     // Componentes de la interfaz de usuario
     private lateinit var campoClave: EditText
     private lateinit var campoNombre: EditText
-    private lateinit var campoEdad: EditText
+    private lateinit var tvEdadCalculada: TextView
     private lateinit var campoFechaNacimiento: EditText
     private lateinit var botonNuevo: Button
     private lateinit var botonGuardar: Button
     private lateinit var botonEliminar: Button
     private lateinit var recyclerView: RecyclerView
 
-    // Evita que el formateo de fecha entre en bucle
-    private var isFormatting = false
+    // Variables para almacenar la fecha seleccionada
+    private var fechaSeleccionada: Date? = null
+
+    // Formato de fecha para mostrar
+    private val formatoFecha = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -77,7 +84,7 @@ class ClientesFragment : Fragment() {
         // Conectar los componentes de la interfaz
         campoClave = vista.findViewById(R.id.etClave)
         campoNombre = vista.findViewById(R.id.etNombre)
-        campoEdad = vista.findViewById(R.id.etEdad)
+        tvEdadCalculada = vista.findViewById(R.id.tvEdadCalculada)
         campoFechaNacimiento = vista.findViewById(R.id.etFechaNacimiento)
         botonNuevo = vista.findViewById(R.id.btnNuevo)
         botonGuardar = vista.findViewById(R.id.btnGuardar)
@@ -87,8 +94,8 @@ class ClientesFragment : Fragment() {
         // Configurar el grid de clientes
         configurarRecyclerView()
 
-        // Configurar el formato automático de fecha
-        configurarFormateoFecha()
+        // Configurar el DatePicker
+        configurarDatePicker()
 
         // Configurar los eventos de los botones
         configurarListeners()
@@ -105,65 +112,97 @@ class ClientesFragment : Fragment() {
     private fun configurarRecyclerView() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         adapter = ClienteGridAdapter { cliente ->
-            // Al hacer click en un cliente, cargar sus datos en el formulario
             cargarClienteEnFormulario(cliente)
         }
         recyclerView.adapter = adapter
     }
 
     /**
-     * Configura el formateo automático de fecha en formato DD-MM-YYYY.
-     *
-     * Ejemplo: cuando el usuario escribe "18012003",
-     * se convierte automáticamente a "18-01-2003".
+     * Configura el DatePicker para seleccionar la fecha de nacimiento.
+     * Restringe fechas futuras (solo permite fechas hasta hoy).
      */
-    private fun configurarFormateoFecha() {
-        campoFechaNacimiento.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
-                // No se necesita acción
+    private fun configurarDatePicker() {
+        campoFechaNacimiento.setOnClickListener {
+            mostrarDatePicker()
+        }
+
+        // También permitir que el usuario haga clic en el campo para abrir el selector
+        campoFechaNacimiento.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                mostrarDatePicker()
             }
+        }
+    }
 
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                // No se necesita acción
-            }
+    /**
+     * Muestra el DatePickerDialog con restricción de fecha máxima (hoy).
+     */
+    private fun mostrarDatePicker() {
+        val calendar = Calendar.getInstance()
+        val year = calendar.get(Calendar.YEAR)
+        val month = calendar.get(Calendar.MONTH)
+        val day = calendar.get(Calendar.DAY_OF_MONTH)
 
-            override fun afterTextChanged(s: Editable?) {
-                // Si estamos formateando, salir para evitar bucles
-                if (isFormatting) return
-                if (s == null) return
+        // Crear el DatePickerDialog
+        val datePickerDialog = DatePickerDialog(
+            requireContext(),
+            { _, selectedYear, selectedMonth, selectedDay ->
+                // Configurar la fecha seleccionada
+                val fechaCalendar = Calendar.getInstance()
+                fechaCalendar.set(selectedYear, selectedMonth, selectedDay)
+                fechaSeleccionada = fechaCalendar.time
 
-                val texto = s.toString()
-                if (texto.isEmpty()) return
+                // Mostrar la fecha en el campo
+                campoFechaNacimiento.setText(formatoFecha.format(fechaSeleccionada!!))
 
-                // Si ya tiene el formato completo, salir
-                if (texto.matches(Regex("^\\d{2}-\\d{2}-\\d{4}$"))) return
+                // Calcular y mostrar la edad
+                calcularYMostrarEdad(fechaSeleccionada!!)
+            },
+            year, month, day
+        )
 
-                // Eliminar cualquier caracter que no sea número
-                val soloNumeros = texto.replace(Regex("[^\\d]"), "")
-                if (soloNumeros.isEmpty()) return
+        // Restringir fechas futuras (máximo = hoy)
+        datePickerDialog.datePicker.maxDate = calendar.timeInMillis
 
-                isFormatting = true
+        // Mostrar el diálogo
+        datePickerDialog.show()
+    }
 
-                try {
-                    // Construir el texto con guiones en formato DD-MM-YYYY
-                    val textoFormateado = when {
-                        soloNumeros.length <= 2 -> soloNumeros
-                        soloNumeros.length <= 4 -> "${soloNumeros.substring(0, 2)}-${soloNumeros.substring(2)}"
-                        soloNumeros.length <= 6 -> "${soloNumeros.substring(0, 2)}-${soloNumeros.substring(2, 4)}-${soloNumeros.substring(4)}"
-                        else -> "${soloNumeros.substring(0, 2)}-${soloNumeros.substring(2, 4)}-${soloNumeros.substring(4, 8)}"
-                    }
+    /**
+     * Calcula la edad a partir de una fecha de nacimiento y la muestra en el TextView.
+     */
+    private fun calcularYMostrarEdad(fechaNacimiento: Date) {
+        val hoy = Date()
+        val edad = calcularEdad(fechaNacimiento, hoy)
 
-                    // Solo actualizar si el texto cambió
-                    if (texto != textoFormateado) {
-                        s.replace(0, s.length, textoFormateado)
-                    }
-                } catch (e: Exception) {
-                    // No hacer nada si hay error
-                } finally {
-                    isFormatting = false
-                }
-            }
-        })
+        if (edad >= 0) {
+            tvEdadCalculada.text = "$edad años"
+        } else {
+            tvEdadCalculada.text = "Fecha inválida"
+        }
+    }
+
+    /**
+     * Calcula la edad exacta entre dos fechas.
+     */
+    private fun calcularEdad(fechaNacimiento: Date, fechaActual: Date): Int {
+        val diffInMillis = fechaActual.time - fechaNacimiento.time
+        val diffInYears = TimeUnit.MILLISECONDS.toDays(diffInMillis) / 365
+
+        // Calcular edad considerando el día exacto
+        val calendarNac = Calendar.getInstance().apply { time = fechaNacimiento }
+        val calendarAct = Calendar.getInstance().apply { time = fechaActual }
+
+        var edad = calendarAct.get(Calendar.YEAR) - calendarNac.get(Calendar.YEAR)
+
+        // Si aún no ha cumplido años este año, restar 1
+        if (calendarAct.get(Calendar.MONTH) < calendarNac.get(Calendar.MONTH) ||
+            (calendarAct.get(Calendar.MONTH) == calendarNac.get(Calendar.MONTH) &&
+                    calendarAct.get(Calendar.DAY_OF_MONTH) < calendarNac.get(Calendar.DAY_OF_MONTH))) {
+            edad--
+        }
+
+        return edad
     }
 
     /**
@@ -191,7 +230,7 @@ class ClientesFragment : Fragment() {
             guardarOActualizarCliente()
         }
 
-        // Botón Eliminar: elimina el cliente actual
+        // Botón Eliminar
         botonEliminar.setOnClickListener {
             if (currentClienteClave != null) {
                 mostrarDialogoEliminar()
@@ -202,67 +241,41 @@ class ClientesFragment : Fragment() {
     }
 
     /**
-     * Busca un cliente por su clave directamente en la API.
-     *
-     * Esta función se ejecuta cuando el usuario termina de escribir una clave
-     * y el campo pierde el foco (setOnFocusChangeListener).
+     * Busca un cliente por su clave.
      */
     private fun buscarClientePorClave() {
-        // Obtener la clave escrita por el usuario y eliminar espacios
         val clave = campoClave.text.toString().trim()
-
-        // Si la clave está vacía, no hacer nada
         if (clave.isEmpty()) return
 
-        // Obtener el token de sesión
         val token = sessionManager.getToken()
-
-        // Si no hay token, la sesión expiró
         if (token == null) {
             Toast.makeText(requireContext(), "Sesión expirada", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Iniciar una corrutina para hacer la petición a la API
-        // lifecycleScope asegura que la corrutina se cancela si el fragmento se destruye
         lifecycleScope.launch {
             try {
-                // Mostrar un mensaje al usuario para indicar que se está buscando
                 Toast.makeText(requireContext(), "Buscando cliente...", Toast.LENGTH_SHORT).show()
-
-                // Llamar a la API para obtener la lista completa de clientes
                 val result = repository.getClientes(token)
 
-                // Verificar si la petición fue exitosa
                 if (result.isSuccess) {
-                    // Obtener la lista de clientes
                     val clientes = result.getOrNull()
-
-                    // Si la lista no es nula, buscar el cliente por su clave
                     if (clientes != null) {
-                        // Buscar en la lista el cliente que coincida con la clave
                         val cliente = clientes.find { it.clave == clave }
 
                         if (cliente != null) {
-                            // Cliente encontrado: cargar sus datos en el formulario
                             cargarClienteEnFormulario(cliente)
                             Toast.makeText(requireContext(), "Cliente encontrado", Toast.LENGTH_SHORT).show()
                         } else {
-                            // Cliente no encontrado: permitir capturar uno nuevo
                             Toast.makeText(requireContext(), "Clave nueva, puedes capturar", Toast.LENGTH_SHORT).show()
-
-                            // Limpiar el formulario pero mantener la clave escrita
                             limpiarFormulario()
                             campoClave.setText(clave)
-
-                            // Resetear el estado de edición
                             isEditing = false
                             currentClienteClave = null
                             botonEliminar.isEnabled = false
                         }
                     }
                 } else {
-                    // Error en la petición: mostrar el mensaje de error
                     Toast.makeText(
                         requireContext(),
                         "Error al buscar: ${result.exceptionOrNull()?.message}",
@@ -270,7 +283,6 @@ class ClientesFragment : Fragment() {
                     ).show()
                 }
             } catch (e: Exception) {
-                // Error inesperado: mostrar el mensaje de error
                 Toast.makeText(requireContext(), "Error al buscar: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
@@ -278,46 +290,38 @@ class ClientesFragment : Fragment() {
 
     /**
      * Convierte una fecha de formato YYYY-MM-DD (API) a DD-MM-YYYY (para mostrar).
-     *
      */
     private fun convertirFechaAParaMostrar(fechaAPI: String?): String {
         if (fechaAPI.isNullOrEmpty()) return ""
-        if (!fechaAPI.contains("-")) return fechaAPI
 
-        try {
-            val partes = fechaAPI.split("-")
-            if (partes.size == 3) {
-                val anio = partes[0]
-                val mes = partes[1]
-                val dia = partes[2]
-                return "$dia-$mes-$anio"
+        return try {
+            val formatoAPI = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val fecha = formatoAPI.parse(fechaAPI)
+            if (fecha != null) {
+                formatoFecha.format(fecha)
+            } else {
+                fechaAPI
             }
         } catch (e: Exception) {
-            // Si hay error, devolver la fecha original
+            fechaAPI
         }
-        return fechaAPI
     }
 
     /**
-     * Convierte una fecha de formato DD-MM-YYYY (usuario) a YYYY-MM-DD (para la API).
-     *
+     * Convierte una fecha de formato DD-MM-YYYY a YYYY-MM-DD (para la API).
      */
     private fun convertirFechaParaAPI(fechaInput: String): String {
-        // Si ya tiene el formato correcto, devolverla tal cual
-        if (fechaInput.matches(Regex("^\\d{4}-\\d{2}-\\d{2}$"))) {
-            return fechaInput
+        return try {
+            val fecha = formatoFecha.parse(fechaInput)
+            val formatoAPI = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            if (fecha != null) {
+                formatoAPI.format(fecha)
+            } else {
+                fechaInput
+            }
+        } catch (e: Exception) {
+            fechaInput
         }
-
-        // Limpiar cualquier caracter que no sea número
-        val soloNumeros = fechaInput.replace(Regex("[^\\d]"), "")
-        if (soloNumeros.length == 8) {
-            val dia = soloNumeros.substring(0, 2)
-            val mes = soloNumeros.substring(2, 4)
-            val anio = soloNumeros.substring(4, 8)
-            return "$anio-$mes-$dia"
-        }
-
-        return fechaInput
     }
 
     /**
@@ -327,11 +331,21 @@ class ClientesFragment : Fragment() {
         try {
             campoClave.setText(cliente.clave)
             campoNombre.setText(cliente.nombre)
-            campoEdad.setText(cliente.edad.toString())
 
-            // Convertir la fecha de YYYY-MM-DD a DD-MM-YYYY para mostrar
+            // Convertir y mostrar la fecha
             val fechaParaMostrar = convertirFechaAParaMostrar(cliente.fecha_Nacimiento)
             campoFechaNacimiento.setText(fechaParaMostrar)
+
+            // Parsear la fecha para calcular la edad
+            try {
+                val fecha = formatoFecha.parse(fechaParaMostrar)
+                if (fecha != null) {
+                    fechaSeleccionada = fecha
+                    calcularYMostrarEdad(fecha)
+                }
+            } catch (e: Exception) {
+                tvEdadCalculada.text = "${cliente.edad} años"
+            }
 
             currentClienteClave = cliente.clave
             isEditing = true
@@ -343,20 +357,14 @@ class ClientesFragment : Fragment() {
 
     /**
      * Guarda o actualiza un cliente.
-     *
-     * El botón siempre dice "Guardar".
-     * Si es un cliente nuevo, lo crea.
-     * Si es un cliente existente, lo actualiza.
-     * Muestra un mensaje diferente según la operación.
      */
     private fun guardarOActualizarCliente() {
         try {
             val clave = campoClave.text.toString().trim()
             val nombre = campoNombre.text.toString().trim()
-            val edadTexto = campoEdad.text.toString().trim()
             val fechaInput = campoFechaNacimiento.text.toString().trim()
 
-            // Validar que todos los campos estén llenos
+            // Validar campos
             if (clave.isEmpty()) {
                 Toast.makeText(requireContext(), "Clave requerida", Toast.LENGTH_SHORT).show()
                 return
@@ -365,26 +373,28 @@ class ClientesFragment : Fragment() {
                 Toast.makeText(requireContext(), "Nombre requerido", Toast.LENGTH_SHORT).show()
                 return
             }
-            if (edadTexto.isEmpty()) {
-                Toast.makeText(requireContext(), "Edad requerida", Toast.LENGTH_SHORT).show()
-                return
-            }
             if (fechaInput.isEmpty()) {
                 Toast.makeText(requireContext(), "Fecha requerida", Toast.LENGTH_SHORT).show()
                 return
             }
 
-            // Validar que la edad sea un número entre 0 y 150
+            // Obtener la edad del TextView
+            val edadTexto = tvEdadCalculada.text.toString().replace(" años", "")
             val edad = edadTexto.toIntOrNull()
+
             if (edad == null || edad < 0 || edad > 150) {
                 Toast.makeText(requireContext(), "Edad inválida", Toast.LENGTH_SHORT).show()
                 return
             }
 
-            // Convertir la fecha de DD-MM-YYYY a YYYY-MM-DD para la API
-            val fechaFormateada = convertirFechaParaAPI(fechaInput)
+            // Validar que la fecha no sea futura
+            if (fechaSeleccionada != null && fechaSeleccionada!!.after(Date())) {
+                Toast.makeText(requireContext(), "La fecha no puede ser futura", Toast.LENGTH_SHORT).show()
+                return
+            }
 
-            // Validar que la fecha convertida tenga el formato correcto
+            // Convertir la fecha para la API
+            val fechaFormateada = convertirFechaParaAPI(fechaInput)
             if (!fechaFormateada.matches(Regex("^\\d{4}-\\d{2}-\\d{2}$"))) {
                 Toast.makeText(requireContext(), "Fecha inválida. Usa DD-MM-YYYY", Toast.LENGTH_SHORT).show()
                 return
@@ -396,7 +406,7 @@ class ClientesFragment : Fragment() {
                 return
             }
 
-            // Crear el objeto Cliente
+            // Crear el objeto Cliente con la edad calculada
             val cliente = Cliente(
                 clave = clave,
                 nombre = nombre,
@@ -404,27 +414,22 @@ class ClientesFragment : Fragment() {
                 fecha_Nacimiento = fechaFormateada
             )
 
-            // Deshabilitar el botón mientras se procesa
             botonGuardar.isEnabled = false
             botonGuardar.text = "Guardando..."
 
             lifecycleScope.launch {
                 try {
-                    // Determinar si es creación o actualización
                     val esNuevo = !isEditing || currentClienteClave == null
-
                     val result = if (esNuevo) {
                         repository.crearCliente(token, cliente)
                     } else {
                         repository.actualizarCliente(token, cliente)
                     }
 
-                    // Restaurar el botón
                     botonGuardar.isEnabled = true
                     botonGuardar.text = "Guardar"
 
                     if (result.isSuccess) {
-                        // Mensaje diferente según la operación
                         val mensaje = if (esNuevo) {
                             "Cliente creado correctamente"
                         } else {
@@ -432,8 +437,6 @@ class ClientesFragment : Fragment() {
                         }
 
                         Toast.makeText(requireContext(), mensaje, Toast.LENGTH_SHORT).show()
-
-                        // Recargar la lista de clientes
                         cargarClientes()
                         limpiarFormulario()
                         isEditing = false
@@ -534,8 +537,9 @@ class ClientesFragment : Fragment() {
     private fun limpiarFormulario() {
         campoClave.text.clear()
         campoNombre.text.clear()
-        campoEdad.text.clear()
+        tvEdadCalculada.text = "0 años"
         campoFechaNacimiento.text.clear()
+        fechaSeleccionada = null
         currentClienteClave = null
         isEditing = false
         botonEliminar.isEnabled = false
@@ -545,13 +549,6 @@ class ClientesFragment : Fragment() {
 
     /**
      * Adaptador interno para mostrar los clientes en el grid.
-     *
-     * Cada fila muestra:
-     * - Clave (columna izquierda)
-     * - Nombre (columna derecha)
-     *
-     * Al hacer click en una fila, se cargan los datos en el formulario.
-     * Las filas alternan colores (gris claro / blanco) para mejor legibilidad.
      */
     inner class ClienteGridAdapter(
         private val onItemClick: (Cliente) -> Unit
@@ -559,15 +556,6 @@ class ClientesFragment : Fragment() {
 
         private var clientes: List<Cliente> = emptyList()
 
-        /**
-         * Obtiene la lista actual de clientes.
-         * Útil para búsquedas locales.
-         */
-        // fun getClientes(): List<Cliente> = clientes
-
-        /**
-         * Actualiza la lista de clientes y notifica los cambios.
-         */
         fun setClientes(lista: List<Cliente>) {
             this.clientes = lista
             notifyDataSetChanged()
@@ -595,14 +583,12 @@ class ClientesFragment : Fragment() {
                 textoNombre.text = cliente.nombre
                 textoEdad.text = cliente.edad.toString()
 
-                // Alternar colores para mejor legibilidad
                 if (posicion % 2 == 0) {
-                    itemView.setBackgroundColor(0xFFF5F5F5.toInt())  // Gris claro
+                    itemView.setBackgroundColor(0xFFF5F5F5.toInt())
                 } else {
-                    itemView.setBackgroundColor(0xFFFFFFFF.toInt())  // Blanco
+                    itemView.setBackgroundColor(0xFFFFFFFF.toInt())
                 }
 
-                // Al hacer click, cargar el cliente en el formulario
                 itemView.setOnClickListener { onItemClick(cliente) }
             }
         }
