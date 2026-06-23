@@ -5,7 +5,7 @@
     android:orientation="horizontal"
     android:padding="12dp"
     android:background="?android:attr/selectableItemBackground"
-    android:weightSum="2"
+    android:weightSum="3"
     android:minHeight="44dp">
 
     <!-- Muestra la clave del cliente -->
@@ -34,6 +34,23 @@
         android:layout_weight="1"
         android:layout_marginStart="8dp"
         android:text="Herculano Pérez"
+        android:textSize="14sp"
+        android:textColor="#333333"
+        android:padding="4dp" />
+
+    <!-- Línea divisoria entre columna Clave y Nombre -->
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="#BDBDBD" />
+
+    <TextView
+        android:id="@+id/tvEdad"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:text=""
         android:textSize="14sp"
         android:textColor="#333333"
         android:padding="4dp" />

@@ -19,6 +19,7 @@ import com.example.proyecto.models.Cliente
 import com.example.proyecto.repository.ClienteRepository
 import com.example.proyecto.utils.SessionManager
 import kotlinx.coroutines.launch
+import org.w3c.dom.Text
 
 /**
  * Fragmento para el CRUD de Clientes.
@@ -562,7 +563,7 @@ class ClientesFragment : Fragment() {
          * Obtiene la lista actual de clientes.
          * Útil para búsquedas locales.
          */
-        fun getClientes(): List<Cliente> = clientes
+        // fun getClientes(): List<Cliente> = clientes
 
         /**
          * Actualiza la lista de clientes y notifica los cambios.
@@ -587,10 +588,12 @@ class ClientesFragment : Fragment() {
         inner class ClienteViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val textoClave: TextView = itemView.findViewById(R.id.tvClave)
             private val textoNombre: TextView = itemView.findViewById(R.id.tvNombre)
+            private val textoEdad: TextView = itemView.findViewById(R.id.tvEdad)
 
             fun bind(cliente: Cliente, posicion: Int) {
                 textoClave.text = cliente.clave
                 textoNombre.text = cliente.nombre
+                textoEdad.text = cliente.edad.toString()
 
                 // Alternar colores para mejor legibilidad
                 if (posicion % 2 == 0) {
